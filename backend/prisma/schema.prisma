@@ -1,0 +1,71 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id            Int           @id @default(autoincrement())
+  name          String
+  email         String        @unique
+  password_hash String
+  reset_password_token_hash String?
+  reset_password_expires_at DateTime?
+  created_at    DateTime      @default(now())
+  Profile       Profile?
+  FoodLogs      FoodLog[]
+  ExerciseLogs  ExerciseLog[]
+  Settings      UserSettings?
+
+  @@index([reset_password_token_hash])
+}
+
+model Profile {
+  id             Int      @id @default(autoincrement())
+  user_id        Int      @unique
+  age            Int
+  gender         String
+  weight_kg      Float
+  height_cm      Float
+  activity_level String
+  goal           String
+  tdee           Int
+  protein_target Int
+  user           User     @relation(fields: [user_id], references: [id])
+}
+
+model FoodLog {
+  id         Int      @id @default(autoincrement())
+  user_id    Int
+  date       String   // YYYY-MM-DD
+  food_name  String
+  calories   Int
+  protein_g  Int
+  meal_type  String?
+  created_at DateTime @default(now())
+  user       User     @relation(fields: [user_id], references: [id])
+}
+
+model ExerciseLog {
+  id              Int      @id @default(autoincrement())
+  user_id         Int
+  date            String   // YYYY-MM-DD
+  exercise_name   String
+  duration_mins   Int
+  calories_burned Int
+  created_at      DateTime @default(now())
+  user            User     @relation(fields: [user_id], references: [id])
+}
+
+model UserSettings {
+  user_id        Int      @id
+  data_retention String   @default("forever")
+  updated_at     DateTime @updatedAt
+  user           User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("UserSettings")
+}
