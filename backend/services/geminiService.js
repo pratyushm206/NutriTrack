@@ -4,7 +4,7 @@ const apiKey = process.env.GEMINI_API_KEY;
 const genAI = new GoogleGenerativeAI(apiKey || '');
 
 // Primary model used for food photo/text analysis and exercise estimation.
-const PRIMARY_GEMINI_MODEL = 'gemini-3.5-flash';
+const PRIMARY_GEMINI_MODEL = 'gemini-3.1-flash-lite';
 // Lighter/cheaper model: used as (a) the fallback for primary calls, and
 // (b) the main model for NutriAI chat, since chat doesn't need flash's heavier reasoning.
 const LITE_GEMINI_MODEL = 'gemini-3.1-flash-lite';
