@@ -177,6 +177,32 @@ async function sendViaEmailApi({ to, from, subject, html, text }) {
     return true;
   }
 
+  if (process.env.BREVO_API_KEY) {
+  await postJson({
+    hostname: 'api.brevo.com',
+    path: '/v3/smtp/email',
+    headers: {
+      'api-key': process.env.BREVO_API_KEY
+    },
+    payload: {
+      sender: {
+        email: stripSenderName(from),
+        name: BRAND_NAME
+      },
+      to: [
+        {
+          email: to
+        }
+      ],
+      subject,
+      htmlContent: html,
+      textContent: text
+    }
+  });
+
+  return true;
+}
+
   if (process.env.RESEND_API_KEY) {
     await postJson({
       hostname: 'api.resend.com',
