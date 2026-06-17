@@ -20,9 +20,6 @@ function parseNonNegativeNumber(value) {
   return Number.isFinite(number) && number >= 0 ? number : null;
 }
 
-const parsedCalories = parseNonNegativeInteger(calories);
-const parsedProtein = parseNonNegativeNumber(protein_g);
-
 router.post('/analyze-text', auth, async (req, res) => {
   try {
     const { description, qty } = req.body;
@@ -73,7 +70,7 @@ router.post('/log', auth, async (req, res) => {
   try {
     const { date, food_name, calories, protein_g, meal_type } = req.body;
     const parsedCalories = parseNonNegativeInteger(calories);
-    const parsedProtein = parseNonNegativeInteger(protein_g);
+    const parsedProtein = parseNonNegativeNumber(protein_g);
     const normalizedFoodName = String(food_name || '').trim();
 
     if (!isDateString(date) || !normalizedFoodName || parsedCalories === null || parsedProtein === null) {
