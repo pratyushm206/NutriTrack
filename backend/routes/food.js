@@ -15,6 +15,14 @@ function parseNonNegativeInteger(value) {
   return Number.isInteger(number) && number >= 0 ? number : null;
 }
 
+function parseNonNegativeNumber(value) {
+  const number = Number(value);
+  return Number.isFinite(number) && number >= 0 ? number : null;
+}
+
+const parsedCalories = parseNonNegativeInteger(calories);
+const parsedProtein = parseNonNegativeNumber(protein_g);
+
 router.post('/analyze-text', auth, async (req, res) => {
   try {
     const { description, qty } = req.body;
