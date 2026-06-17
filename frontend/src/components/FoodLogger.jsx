@@ -3,10 +3,12 @@ import { Beef, Camera, Edit3, Flame, Leaf, Sparkles, Wheat, X } from 'lucide-rea
 import api from '../utils/api';
 import NutriAILogo from './NutriAILogo';
 
-const MAX_ANALYSIS_IMAGE_DIMENSION = 1280;
-const ANALYSIS_IMAGE_QUALITY = 0.82;
-const MAX_ANALYSIS_IMAGE_BYTES = 4 * 1024 * 1024;
+const ANALYSIS_IMAGE_QUALITIES = [0.82, 0.74, 0.66];
+const ANALYSIS_IMAGE_DIMENSIONS = [1280, 1100, 960];
+const TARGET_ANALYSIS_IMAGE_BYTES = 1 * 1024 * 1024;
+const MAX_ANALYSIS_IMAGE_BYTES = 1.5 * 1024 * 1024;
 const ACCEPTED_ANALYSIS_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const GENERIC_IMAGE_ERROR = 'Unable to process this image. Please choose another photo.';
 
 export default function FoodLogger({ date, onLogAdded }) {
   const [mode, setMode] = useState('text'); // text, photo, manual
@@ -52,7 +54,7 @@ export default function FoodLogger({ date, onLogAdded }) {
 
       await analyzePhoto({ base64Image, mimeType });
     } catch (err) {
-      setError(err.message || 'Failed to prepare image. Try a smaller JPEG photo or enter it manually.');
+      setError(err.message || GENERIC_IMAGE_ERROR);
       setLoading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
@@ -178,7 +180,7 @@ export default function FoodLogger({ date, onLogAdded }) {
               )}
               <input 
                 type="file" 
-                accept="image/*" 
+                accept="image/jpeg,image/png,image/webp" 
                 ref={fileInputRef} 
                 className="hidden" 
                 onChange={handlePhotoUpload}
@@ -447,42 +449,61 @@ function formatMode(mode) {
 }
 
 async function prepareImageForAnalysis(file) {
-  const canUseOriginal = ACCEPTED_ANALYSIS_TYPES.has(file.type) && file.size <= MAX_ANALYSIS_IMAGE_BYTES;
+  if (!ACCEPTED_ANALYSIS_TYPES.has(file.type)) {
+    throw new Error(GENERIC_IMAGE_ERROR);
+  }
 
   try {
     return await compressImageForAnalysis(file);
   } catch (error) {
-    if (canUseOriginal) {
-      const dataUrl = await readFileAsDataUrl(file);
-      return dataUrlToPayload(dataUrl, file.type);
+    if (error?.code === 'IMAGE_TOO_LARGE') {
+      throw new Error('This photo is too large to analyze reliably. Please choose another photo.', { cause: error });
     }
 
-    const typeHint = file.type ? ` (${file.type})` : '';
-    throw new Error(`This camera image${typeHint} is too large or is not browser-decodable. Please choose a JPEG/PNG image or take a screenshot/photo copy and try again.`, { cause: error });
+    throw new Error(GENERIC_IMAGE_ERROR, { cause: error });
   }
 }
 
 async function compressImageForAnalysis(file) {
   const bitmap = await loadImageBitmap(file);
-  const scale = Math.min(1, MAX_ANALYSIS_IMAGE_DIMENSION / Math.max(bitmap.width, bitmap.height));
-  const width = Math.max(1, Math.round(bitmap.width * scale));
-  const height = Math.max(1, Math.round(bitmap.height * scale));
+  let bestBlob = null;
 
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('Could not prepare the image for upload.');
+  try {
+    for (const maxDimension of ANALYSIS_IMAGE_DIMENSIONS) {
+      const scale = Math.min(1, maxDimension / Math.max(bitmap.width, bitmap.height));
+      const width = Math.max(1, Math.round(bitmap.width * scale));
+      const height = Math.max(1, Math.round(bitmap.height * scale));
 
-  ctx.drawImage(bitmap, 0, 0, width, height);
-  if (typeof bitmap.close === 'function') bitmap.close();
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Could not prepare the image for upload.');
 
-  const blob = await canvasToBlob(canvas, 'image/jpeg', ANALYSIS_IMAGE_QUALITY);
-  if (blob.size > MAX_ANALYSIS_IMAGE_BYTES) {
-    throw new Error('The compressed image is still too large. Please crop the photo or choose a smaller image.');
+      ctx.drawImage(bitmap, 0, 0, width, height);
+
+      for (const quality of ANALYSIS_IMAGE_QUALITIES) {
+        const blob = await canvasToBlob(canvas, 'image/jpeg', quality);
+        if (!bestBlob || blob.size < bestBlob.size) {
+          bestBlob = blob;
+        }
+        if (blob.size <= TARGET_ANALYSIS_IMAGE_BYTES) {
+          const dataUrl = await readFileAsDataUrl(blob);
+          return dataUrlToPayload(dataUrl, 'image/jpeg');
+        }
+      }
+    }
+  } finally {
+    if (typeof bitmap.close === 'function') bitmap.close();
   }
 
-  const dataUrl = await readFileAsDataUrl(blob);
+  if (!bestBlob || bestBlob.size > MAX_ANALYSIS_IMAGE_BYTES) {
+    const error = new Error('Compressed image exceeds upload limit.');
+    error.code = 'IMAGE_TOO_LARGE';
+    throw error;
+  }
+
+  const dataUrl = await readFileAsDataUrl(bestBlob);
   return dataUrlToPayload(dataUrl, 'image/jpeg');
 }
 
@@ -538,15 +559,15 @@ function getFriendlyAnalysisError(err, fallback) {
   const message = err.response?.data?.error || err.response?.data?.details || err.message || '';
 
   if (err.code === 'ECONNABORTED' || message.toLowerCase().includes('timeout')) {
-    return 'The photo upload or analysis took too long. The image is still selected, so try again on a stronger connection or choose a smaller/cropped photo.';
+    return 'The photo analysis took too long. Please try again in a few moments.';
   }
 
   if (err.response?.status === 413 || message.toLowerCase().includes('too large')) {
-    return 'That photo is too large to analyze reliably. Please crop it or choose a smaller JPEG photo.';
+    return 'This photo is too large to analyze reliably. Please choose another photo.';
   }
 
-  if (message.includes('503') || message.toLowerCase().includes('high demand') || message.toLowerCase().includes('service unavailable')) {
-    return 'Gemini is busy right now. Your photo is still selected, so try again in a moment or enter the nutrition manually.';
+  if (message.includes('503') || message.toLowerCase().includes('high demand') || message.toLowerCase().includes('service unavailable') || message.toLowerCase().includes('temporarily unavailable')) {
+    return 'NutriAI is currently experiencing high demand. Please try again in a few moments.';
   }
 
   if (message.includes('429') || message.toLowerCase().includes('quota')) {

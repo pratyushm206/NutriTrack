@@ -151,7 +151,7 @@ function getFriendlyExerciseError(err) {
   const message = err.response?.data?.error || err.message || '';
 
   if (message.includes('503') || message.toLowerCase().includes('high demand')) {
-    return 'Gemini is busy right now. Try analyzing again in a moment.';
+    return 'NutriAI is currently experiencing high demand. Please try again in a few moments.';
   }
 
   if (message.includes('429') || message.toLowerCase().includes('quota')) {

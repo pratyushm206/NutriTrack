@@ -3,10 +3,12 @@ import { Activity, Camera, CalendarDays, Lightbulb, Search, Send, Sparkles, Tras
 import NutriTrackLogo from '../components/NutriTrackLogo';
 import api from '../utils/api';
 
-const MAX_CHAT_IMAGE_DIMENSION = 1280;
-const CHAT_IMAGE_QUALITY = 0.82;
-const MAX_CHAT_IMAGE_BYTES = 4 * 1024 * 1024;
+const CHAT_IMAGE_QUALITIES = [0.82, 0.74, 0.66];
+const CHAT_IMAGE_DIMENSIONS = [1280, 1100, 960];
+const TARGET_CHAT_IMAGE_BYTES = 1 * 1024 * 1024;
+const MAX_CHAT_IMAGE_BYTES = 1.5 * 1024 * 1024;
 const ACCEPTED_CHAT_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const GENERIC_CHAT_IMAGE_ERROR = 'Unable to process this image. Please choose another photo.';
 
 const promptSuggestions = [
   'Review my calories & protein today',
@@ -105,7 +107,7 @@ export default function NutriAIPage() {
       setSelectedImage({ ...payload, name: file.name });
     } catch (error) {
       setSelectedImage(null);
-      setImageError(error.message || 'Could not prepare this image. Please try a smaller JPEG, PNG, or WEBP file.');
+      setImageError(error.message || GENERIC_CHAT_IMAGE_ERROR);
       if (imageInputRef.current) imageInputRef.current.value = '';
     }
   };
@@ -209,7 +211,7 @@ export default function NutriAIPage() {
           <button className="nutriai-input-action" type="button" title="Attach image" onClick={() => imageInputRef.current?.click()} disabled={loading}>
             <Camera />
           </button>
-          <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageAttach} />
+          <input ref={imageInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleImageAttach} />
           <div className="nutriai-composer-stack">
             {selectedImage && (
               <div className="nutriai-attachment-preview">
@@ -243,42 +245,61 @@ export default function NutriAIPage() {
 }
 
 async function prepareChatImage(file) {
-  const canUseOriginal = ACCEPTED_CHAT_IMAGE_TYPES.has(file.type) && file.size <= MAX_CHAT_IMAGE_BYTES;
+  if (!ACCEPTED_CHAT_IMAGE_TYPES.has(file.type)) {
+    throw new Error(GENERIC_CHAT_IMAGE_ERROR);
+  }
 
   try {
     return await compressChatImage(file);
   } catch (error) {
-    if (canUseOriginal) {
-      const dataUrl = await readFileAsDataUrl(file);
-      return dataUrlToPayload(dataUrl, file.type);
+    if (error?.code === 'IMAGE_TOO_LARGE') {
+      throw new Error('This photo is too large to analyze reliably. Please choose another photo.', { cause: error });
     }
 
-    const typeHint = file.type ? ` (${file.type})` : '';
-    throw new Error(`This image${typeHint} is too large or cannot be read. Please choose a smaller JPEG, PNG, or WEBP image.`, { cause: error });
+    throw new Error(GENERIC_CHAT_IMAGE_ERROR, { cause: error });
   }
 }
 
 async function compressChatImage(file) {
   const bitmap = await loadImageBitmap(file);
-  const scale = Math.min(1, MAX_CHAT_IMAGE_DIMENSION / Math.max(bitmap.width, bitmap.height));
-  const width = Math.max(1, Math.round(bitmap.width * scale));
-  const height = Math.max(1, Math.round(bitmap.height * scale));
+  let bestBlob = null;
 
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('Could not prepare the image for upload.');
+  try {
+    for (const maxDimension of CHAT_IMAGE_DIMENSIONS) {
+      const scale = Math.min(1, maxDimension / Math.max(bitmap.width, bitmap.height));
+      const width = Math.max(1, Math.round(bitmap.width * scale));
+      const height = Math.max(1, Math.round(bitmap.height * scale));
 
-  ctx.drawImage(bitmap, 0, 0, width, height);
-  if (typeof bitmap.close === 'function') bitmap.close();
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Could not prepare the image for upload.');
 
-  const blob = await canvasToBlob(canvas, 'image/jpeg', CHAT_IMAGE_QUALITY);
-  if (blob.size > MAX_CHAT_IMAGE_BYTES) {
-    throw new Error('The compressed image is still too large. Please crop it or choose a smaller image.');
+      ctx.drawImage(bitmap, 0, 0, width, height);
+
+      for (const quality of CHAT_IMAGE_QUALITIES) {
+        const blob = await canvasToBlob(canvas, 'image/jpeg', quality);
+        if (!bestBlob || blob.size < bestBlob.size) {
+          bestBlob = blob;
+        }
+        if (blob.size <= TARGET_CHAT_IMAGE_BYTES) {
+          const dataUrl = await readFileAsDataUrl(blob);
+          return dataUrlToPayload(dataUrl, 'image/jpeg');
+        }
+      }
+    }
+  } finally {
+    if (typeof bitmap.close === 'function') bitmap.close();
   }
 
-  const dataUrl = await readFileAsDataUrl(blob);
+  if (!bestBlob || bestBlob.size > MAX_CHAT_IMAGE_BYTES) {
+    const error = new Error('Compressed image exceeds upload limit.');
+    error.code = 'IMAGE_TOO_LARGE';
+    throw error;
+  }
+
+  const dataUrl = await readFileAsDataUrl(bestBlob);
   return dataUrlToPayload(dataUrl, 'image/jpeg');
 }
 

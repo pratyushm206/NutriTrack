@@ -4,6 +4,7 @@ const { chatWithNutritionAI } = require('../services/geminiService');
 const prisma = require('../lib/prisma');
 
 const router = express.Router();
+const MAX_CHAT_IMAGE_BYTES = 1.5 * 1024 * 1024;
 
 router.post('/chat', auth, async (req, res) => {
   try {
@@ -18,8 +19,8 @@ router.post('/chat', auth, async (req, res) => {
       }
 
       const imageBytes = Math.ceil(image.base64Image.length * 0.75);
-      if (imageBytes > 4 * 1024 * 1024) {
-        return res.status(413).json({ error: 'Image is too large. Please crop it or upload a smaller JPEG/PNG photo.' });
+      if (imageBytes > MAX_CHAT_IMAGE_BYTES) {
+        return res.status(413).json({ error: 'Image is too large. Please choose another photo.' });
       }
     }
 

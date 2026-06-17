@@ -2,7 +2,13 @@ const { GoogleGenerativeAI, SchemaType } = require('@google/generative-ai');
 
 const apiKey = process.env.GEMINI_API_KEY;
 const genAI = new GoogleGenerativeAI(apiKey || '');
-const GEMINI_MODELS = ['gemini-flash-latest', 'gemini-3-flash-preview'];
+const GEMINI_MODELS = [
+  'gemini-3.5-flash',
+  'gemini-3.1-flash-lite'
+];
+const FALLBACK_GEMINI_MODEL = 'gemini-3.1-flash-lite';
+const MAX_GEMINI_ATTEMPTS = 3;
+const GEMINI_RETRY_DELAYS_MS = [2000, 4000];
 
 function assertGeminiKey() {
   if (!apiKey || apiKey === 'your_gemini_api_key_here') {
@@ -15,10 +21,58 @@ function normalizeGeminiError(error) {
   if (message.includes('API key not valid') || message.includes('API_KEY_INVALID')) {
     return new Error('Gemini API key is invalid. Replace GEMINI_API_KEY in backend/.env with a valid key from Google AI Studio, then restart the backend server.');
   }
+  if (isTransientGeminiError(error)) {
+    return new Error('NutriAI is currently experiencing high demand. Please try again in a few moments.');
+  }
   if (message.includes('is not found for API version') || message.includes('not supported for generateContent')) {
     return new Error('Configured Gemini model is unavailable. Update GEMINI_MODEL in backend/services/geminiService.js to a model that supports generateContent.');
   }
   return error;
+}
+
+function isTransientGeminiError(error) {
+  const message = String(error?.message || '').toLowerCase();
+  const status = error?.status || error?.statusCode || error?.response?.status;
+
+  return status === 503
+    || message.includes('503')
+    || message.includes('high demand')
+    || message.includes('service unavailable')
+    || message.includes('temporarily unavailable')
+    || message.includes('temporary failure')
+    || message.includes('transient');
+}
+
+function wait(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function runGeminiWithRetry(createModel, generate) {
+  let lastError;
+
+  for (let attempt = 1; attempt <= MAX_GEMINI_ATTEMPTS; attempt += 1) {
+    const modelName = attempt < MAX_GEMINI_ATTEMPTS ? GEMINI_MODELS[0] : FALLBACK_GEMINI_MODEL;
+    if (attempt === MAX_GEMINI_ATTEMPTS && modelName !== GEMINI_MODELS[0]) {
+      console.log(`Switching to fallback model: ${modelName}`);
+    }
+    console.log(`Gemini model: ${modelName}`);
+
+    const model = createModel(modelName);
+
+    try {
+      return await generate(model);
+    } catch (error) {
+      lastError = error;
+      if (!isTransientGeminiError(error) || attempt === MAX_GEMINI_ATTEMPTS) {
+        break;
+      }
+
+      console.log(`Retry ${attempt + 1}/3 after Gemini 503`);
+      await wait(GEMINI_RETRY_DELAYS_MS[attempt - 1]);
+    }
+  }
+
+  throw lastError;
 }
 
 // 1. Define the exact JSON structure you want returned
@@ -111,59 +165,37 @@ const exerciseSchema = {
 };
 
 async function generateNutritionContent(parts, systemInstruction) {
-  let lastError;
-
-  for (const modelName of GEMINI_MODELS) {
-    const model = genAI.getGenerativeModel({
+  return runGeminiWithRetry(
+    modelName => genAI.getGenerativeModel({
       model: modelName,
       generationConfig: {
         responseMimeType: "application/json",
         responseSchema: nutritionSchema,
       },
       systemInstruction
-    });
-
-    try {
+    }),
+    async model => {
       const result = await model.generateContent(parts);
       return JSON.parse(result.response.text());
-    } catch (error) {
-      lastError = error;
-      const message = error?.message || '';
-      if (!message.includes('503') && !message.toLowerCase().includes('high demand')) {
-        break;
-      }
     }
-  }
-
-  throw lastError;
+  );
 }
 
 async function generateExerciseContent(prompt) {
-  let lastError;
-
-  for (const modelName of GEMINI_MODELS) {
-    const model = genAI.getGenerativeModel({
+  return runGeminiWithRetry(
+    modelName => genAI.getGenerativeModel({
       model: modelName,
       generationConfig: {
         responseMimeType: "application/json",
         responseSchema: exerciseSchema,
       },
       systemInstruction: "You are an exercise physiology assistant. Estimate calorie burn from activity, duration, body weight, and intensity. Fat and carbohydrate burn are estimates, not exact medical measurements. Return only JSON."
-    });
-
-    try {
+    }),
+    async model => {
       const result = await model.generateContent(prompt);
       return JSON.parse(result.response.text());
-    } catch (error) {
-      lastError = error;
-      const message = error?.message || '';
-      if (!message.includes('503') && !message.toLowerCase().includes('high demand')) {
-        break;
-      }
     }
-  }
-
-  throw lastError;
+  );
 }
 
 async function analyzeTextFood(description, qty) {
@@ -189,7 +221,7 @@ async function analyzePhotoFood(base64Image, mimeType) {
     return await withTimeout(
       generateNutritionContent([prompt, imagePart], "You are a nutrition expert and food image analyst, especially familiar with Indian meals and thalis. Estimate portions carefully from the image and return only the requested JSON."),
       45000,
-      'Photo analysis took too long. Please try again with a smaller or cropped image.'
+      'Photo analysis took too long. Please try again in a few moments.'
     );
   } catch (error) {
     console.error("Gemini API Error (Photo):", error);
@@ -225,31 +257,22 @@ Answer like a practical nutrition coach. Use the user's profile and recent logs 
     ? [prompt, { inlineData: { data: image.base64Image, mimeType: image.mimeType } }]
     : prompt;
 
-  let lastError;
-
-  for (const modelName of GEMINI_MODELS) {
-    const model = genAI.getGenerativeModel({
+  try {
+    const result = await runGeminiWithRetry(
+      modelName => genAI.getGenerativeModel({
       model: modelName,
       systemInstruction: "You are NutriAI, a friendly nutrition and routine assistant for NutriTrack. You help users understand their food logs, calories, protein, exercise, and meal choices. You are not a doctor."
-    });
-
-    try {
-      const result = await withTimeout(
+      }),
+      model => withTimeout(
         model.generateContent(parts),
         35000,
         'NutriAI took too long to respond. Please try again with a shorter question.'
-      );
-      return result.response.text();
-    } catch (error) {
-      lastError = error;
-      const messageText = error?.message || '';
-      if (!messageText.includes('503') && !messageText.toLowerCase().includes('high demand')) {
-        break;
-      }
-    }
+      )
+    );
+    return result.response.text();
+  } catch (error) {
+    throw normalizeGeminiError(error);
   }
-
-  throw normalizeGeminiError(lastError);
 }
 
 function withTimeout(promise, timeoutMs, message) {
