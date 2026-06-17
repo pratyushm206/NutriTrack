@@ -54,7 +54,11 @@ import {
   attachStoredAnalyses,
   attachStoredExerciseAnalyses
 } from './pages/Dashboard';
-import api from './utils/api';
+import api, {
+  BACKEND_KEEP_ALIVE_INTERVAL_MS,
+  BACKEND_WAKE_RETRY_MS,
+  wakeBackend
+} from './utils/api';
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -1262,6 +1266,72 @@ function createProfileDraft(profile, user) {
   };
 }
 
+function BackendWakeMonitor() {
+  const { user } = useAuth();
+  const [status, setStatus] = useState('checking');
+
+  useEffect(() => {
+    let cancelled = false;
+    let retryTimer = null;
+    let keepAliveTimer = null;
+
+    const clearTimers = () => {
+      if (retryTimer) window.clearTimeout(retryTimer);
+      if (keepAliveTimer) window.clearInterval(keepAliveTimer);
+    };
+
+    const ping = async ({ retryOnFailure } = { retryOnFailure: false }) => {
+      try {
+        await wakeBackend();
+        if (cancelled) return;
+        if (retryTimer) {
+          window.clearTimeout(retryTimer);
+          retryTimer = null;
+        }
+        setStatus('ready');
+
+        if (!keepAliveTimer) {
+          keepAliveTimer = window.setInterval(() => {
+            if (document.visibilityState === 'visible') {
+              wakeBackend().catch(() => setStatus('waking'));
+            }
+          }, BACKEND_KEEP_ALIVE_INTERVAL_MS);
+        }
+      } catch {
+        if (cancelled) return;
+        setStatus('waking');
+        if (retryOnFailure) {
+          retryTimer = window.setTimeout(() => ping({ retryOnFailure: true }), BACKEND_WAKE_RETRY_MS);
+        }
+      }
+    };
+
+    const handleVisible = () => {
+      if (document.visibilityState === 'visible') {
+        ping({ retryOnFailure: true });
+      }
+    };
+
+    ping({ retryOnFailure: true });
+    document.addEventListener('visibilitychange', handleVisible);
+
+    return () => {
+      cancelled = true;
+      clearTimers();
+      document.removeEventListener('visibilitychange', handleVisible);
+    };
+  }, []);
+
+  if (!user || status === 'ready' || status === 'checking') return null;
+
+  return (
+    <div className="backend-wake-banner" role="status" aria-live="polite">
+      <Loader2 className="h-4 w-4 animate-spin" />
+      <span>Waking NutriTrack server...</span>
+    </div>
+  );
+}
+
 function getCachedWeeklyRecords() {
   try {
     const cached = JSON.parse(localStorage.getItem('nutritrack-weekly-cache') || '{}');
@@ -1285,6 +1355,7 @@ function AppContent() {
   return (
     <div className="min-h-screen">
       <Navbar />
+      <BackendWakeMonitor />
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:py-8">
         <Routes>
           <Route path="/" element={<HomeRoute />} />

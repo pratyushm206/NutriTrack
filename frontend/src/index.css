@@ -123,6 +123,13 @@
     background: rgba(255, 255, 255, 0.96);
     border: 1px solid rgba(100, 116, 139, 0.34);
     box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.06), 0 1px 0 rgba(255, 255, 255, 0.9);
+    color-scheme: light;
+  }
+
+  select.input-field,
+  .input-field option {
+    background: #ffffff;
+    color: #0f172a;
   }
 
   .input-field:focus {
@@ -1680,6 +1687,13 @@ body.dark .input-field {
   background: linear-gradient(145deg, rgba(2, 6, 23, 0.62), rgba(15, 23, 42, 0.72));
   border-color: rgba(148, 163, 184, 0.18);
   box-shadow: inset 7px 7px 16px rgba(0, 0, 0, 0.18), inset -4px -4px 12px rgba(255, 255, 255, 0.025);
+  color-scheme: dark;
+}
+
+body.dark select.input-field,
+body.dark .input-field option {
+  background: #0f172a;
+  color: #f8fafc;
 }
 
 body.dark .input-field:focus {
@@ -2025,6 +2039,12 @@ body:not(.dark) .icon-button:hover {
   border-radius: 0.75rem;
   background: var(--nt-elevated);
   border-color: var(--nt-border);
+  color: var(--nt-text);
+}
+
+select.input-field,
+.input-field option {
+  background: var(--nt-elevated);
   color: var(--nt-text);
 }
 
@@ -4908,6 +4928,26 @@ body.dark:has(.dashboard-loading-page) .brand-subtitle {
   padding-block: 1px 3rem;
 }
 
+.backend-wake-banner {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 80;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  max-width: min(24rem, calc(100vw - 2rem));
+  border: 1px solid rgba(45, 212, 191, 0.28);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.94);
+  box-shadow: 0 18px 44px rgba(2, 6, 23, 0.28);
+  color: #ccfbf1;
+  padding: 0.75rem 0.9rem;
+  font-size: 0.85rem;
+  font-weight: 900;
+  backdrop-filter: blur(14px);
+}
+
 .dashboard-loader {
   overflow: hidden;
   border-radius: 16px;
@@ -6587,6 +6627,12 @@ body.dark .dashboard-page #exercise-log .card > :is([class*="rounded-lg"][class*
   color: #f7fff7;
   font-size: 0.86rem;
   font-weight: 800;
+  color-scheme: dark;
+}
+
+.nt-edit-profile-grid select option {
+  background: #0f172a;
+  color: #f8fafc;
 }
 
 .nt-edit-profile-status {
@@ -7955,6 +8001,12 @@ body:has(.nutritrack-chat-page) {
   padding: 0 0.65rem;
   color: #eef7ef;
   outline: none;
+  color-scheme: dark;
+}
+
+.nt-setting-row select option {
+  background: #0f172a;
+  color: #f8fafc;
 }
 
 .nt-num-input {

@@ -7,7 +7,7 @@ import ExerciseLogger from '../components/ExerciseLogger';
 import NutriAILogo from '../components/NutriAILogo';
 import VantaBirdsBackground from '../components/VantaBirdsBackground';
 import { useAuth } from '../contexts/useAuth';
-import api from '../utils/api';
+import api, { BACKEND_WAKE_EVENT } from '../utils/api';
 
 const NUTRITION_TIPS = [
   'Pair every main meal with a protein anchor like paneer, eggs, dal, chicken, tofu, curd, or sprouts.',
@@ -29,6 +29,8 @@ export default function Dashboard() {
   const [selectedExercise, setSelectedExercise] = useState(null);
   const [macroDetail, setMacroDetail] = useState(null);
   const [isFetching, setIsFetching] = useState(false);
+  const [loadError, setLoadError] = useState('');
+  const [refreshSignal, setRefreshSignal] = useState(0);
   const [historyCalendarOpen, setHistoryCalendarOpen] = useState(false);
   const [visibleMonth, setVisibleMonth] = useState(startOfMonth(startOfToday()));
   const [streak, setStreak] = useState({ current: 0, best: 0, trackedDates: [] });
@@ -61,6 +63,15 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
+    const refetchWhenBackendWakes = () => {
+      setRefreshSignal(signal => signal + 1);
+    };
+
+    window.addEventListener(BACKEND_WAKE_EVENT, refetchWhenBackendWakes);
+    return () => window.removeEventListener(BACKEND_WAKE_EVENT, refetchWhenBackendWakes);
+  }, []);
+
+  useEffect(() => {
     let ignore = false;
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
 
@@ -77,11 +88,15 @@ export default function Dashboard() {
           setProfile(profileRes.data);
           setFoodLogs(attachStoredAnalyses(foodRes.data));
           setExerciseLogs(attachStoredExerciseAnalyses(exRes.data));
+          setLoadError('');
         }
       } catch (err) {
         if (err.response?.status === 401) {
           logout();
           return;
+        }
+        if (!ignore) {
+          setLoadError('The backend is waking up. NutriTrack will refresh this dashboard automatically.');
         }
         console.error(err);
       } finally {
@@ -94,7 +109,7 @@ export default function Dashboard() {
     return () => {
       ignore = true;
     };
-  }, [logout, selectedDate]);
+  }, [logout, selectedDate, refreshSignal]);
 
   const deleteFood = async (id) => {
     await api.delete(`/api/food/log/${id}`);
@@ -122,7 +137,9 @@ export default function Dashboard() {
               <span />
             </div>
             <p className="dashboard-loader-title">Loading dashboard...</p>
-            <p className="dashboard-loader-copy mt-1">Preparing your calories, protein, and daily records.</p>
+            <p className="dashboard-loader-copy mt-1">
+              {loadError || 'Preparing your calories, protein, and daily records.'}
+            </p>
             <div className="dashboard-loader-track mt-5">
               <div />
             </div>

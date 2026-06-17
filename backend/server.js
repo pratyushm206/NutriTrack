@@ -23,7 +23,8 @@ app.use(cors({
       return callback(null, true);
     }
     return callback(new Error('Not allowed by CORS'));
-  }
+  },
+  credentials: true
 }));
 // Increase limits for base64 image uploads
 app.use(express.json({ limit: '8mb' }));

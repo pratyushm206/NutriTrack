@@ -29,7 +29,18 @@ function hashResetToken(token) {
 }
 
 function getFrontendUrl() {
-  return (process.env.FRONTEND_URL || process.env.CORS_ORIGIN || 'http://localhost:5173').split(',')[0].trim().replace(/\/$/, '');
+  const configuredUrl = (process.env.FRONTEND_URL || process.env.CORS_ORIGIN || '')
+    .split(',')[0]
+    .trim()
+    .replace(/\/$/, '');
+
+  if (configuredUrl) return configuredUrl;
+
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('FRONTEND_URL or CORS_ORIGIN must be configured in production.');
+  }
+
+  return 'http://localhost:5173';
 }
 
 router.post('/signup', async (req, res) => {
