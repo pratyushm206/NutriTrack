@@ -2,13 +2,19 @@ const { GoogleGenerativeAI, SchemaType } = require('@google/generative-ai');
 
 const apiKey = process.env.GEMINI_API_KEY;
 const genAI = new GoogleGenerativeAI(apiKey || '');
-const GEMINI_MODELS = [
-  'gemini-3.5-flash',
-  'gemini-3.1-flash-lite'
-];
-const FALLBACK_GEMINI_MODEL = 'gemini-3.1-flash-lite';
-const MAX_GEMINI_ATTEMPTS = 3;
-const GEMINI_RETRY_DELAYS_MS = [2000, 4000];
+
+// Primary model used for food photo/text analysis and exercise estimation.
+const PRIMARY_GEMINI_MODEL = 'gemini-3.5-flash';
+// Lighter/cheaper model: used as (a) the fallback for primary calls, and
+// (b) the main model for NutriAI chat, since chat doesn't need flash's heavier reasoning.
+const LITE_GEMINI_MODEL = 'gemini-3.1-flash-lite';
+
+// One real attempt on the primary model, one retry on primary (in case of a
+// genuine transient blip), then ONE final attempt on the lite model. This is
+// 2 Gemini calls in the worst case (not 3), and the lite call only happens
+// once primary has definitively failed.
+const MAX_PRIMARY_ATTEMPTS = 2;
+const PRIMARY_RETRY_DELAY_MS = 2000;
 
 function assertGeminiKey() {
   if (!apiKey || apiKey === 'your_gemini_api_key_here') {
@@ -25,7 +31,7 @@ function normalizeGeminiError(error) {
     return new Error('NutriAI is currently experiencing high demand. Please try again in a few moments.');
   }
   if (message.includes('is not found for API version') || message.includes('not supported for generateContent')) {
-    return new Error('Configured Gemini model is unavailable. Update GEMINI_MODEL in backend/services/geminiService.js to a model that supports generateContent.');
+    return new Error('Configured Gemini model is unavailable. Update the Gemini model name in backend/services/geminiService.js to a model that supports generateContent.');
   }
   return error;
 }
@@ -47,32 +53,50 @@ function wait(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-async function runGeminiWithRetry(createModel, generate) {
+/**
+ * Runs `generate` against the primary model first. Only on a transient
+ * failure does it retry primary once, and only after THAT fails does it
+ * fall back to the lite model — a single time, no further retries.
+ *
+ * createModel(modelName) -> model instance
+ * generate(model) -> Promise<result>
+ */
+async function runGeminiWithFallback(createModel, generate) {
   let lastError;
 
-  for (let attempt = 1; attempt <= MAX_GEMINI_ATTEMPTS; attempt += 1) {
-    const modelName = attempt < MAX_GEMINI_ATTEMPTS ? GEMINI_MODELS[0] : FALLBACK_GEMINI_MODEL;
-    if (attempt === MAX_GEMINI_ATTEMPTS && modelName !== GEMINI_MODELS[0]) {
-      console.log(`Switching to fallback model: ${modelName}`);
-    }
-    console.log(`Gemini model: ${modelName}`);
-
-    const model = createModel(modelName);
+  // Try the primary model up to MAX_PRIMARY_ATTEMPTS times.
+  for (let attempt = 1; attempt <= MAX_PRIMARY_ATTEMPTS; attempt += 1) {
+    console.log(`Gemini model: ${PRIMARY_GEMINI_MODEL} (attempt ${attempt}/${MAX_PRIMARY_ATTEMPTS})`);
+    const model = createModel(PRIMARY_GEMINI_MODEL);
 
     try {
       return await generate(model);
     } catch (error) {
       lastError = error;
-      if (!isTransientGeminiError(error) || attempt === MAX_GEMINI_ATTEMPTS) {
-        break;
+      if (!isTransientGeminiError(error)) {
+        // Non-transient error (bad key, invalid model, bad request, etc.) —
+        // don't waste time retrying or falling back, just surface it.
+        throw error;
       }
-
-      console.log(`Retry ${attempt + 1}/3 after Gemini 503`);
-      await wait(GEMINI_RETRY_DELAYS_MS[attempt - 1]);
+      if (attempt < MAX_PRIMARY_ATTEMPTS) {
+        console.log(`Transient error on ${PRIMARY_GEMINI_MODEL}, retrying in ${PRIMARY_RETRY_DELAY_MS}ms`);
+        await wait(PRIMARY_RETRY_DELAY_MS);
+      }
     }
   }
 
-  throw lastError;
+  // Primary model exhausted its attempts — fall back to lite, once.
+  console.log(`Falling back to lite model: ${LITE_GEMINI_MODEL}`);
+  try {
+    const model = createModel(LITE_GEMINI_MODEL);
+    return await generate(model);
+  } catch (error) {
+    throw isTransientGeminiError(error) ? error : error;
+  } finally {
+    if (lastError) {
+      // no-op, kept for clarity that lastError was primary's failure reason
+    }
+  }
 }
 
 // 1. Define the exact JSON structure you want returned
@@ -165,7 +189,7 @@ const exerciseSchema = {
 };
 
 async function generateNutritionContent(parts, systemInstruction) {
-  return runGeminiWithRetry(
+  return runGeminiWithFallback(
     modelName => genAI.getGenerativeModel({
       model: modelName,
       generationConfig: {
@@ -182,7 +206,7 @@ async function generateNutritionContent(parts, systemInstruction) {
 }
 
 async function generateExerciseContent(prompt) {
-  return runGeminiWithRetry(
+  return runGeminiWithFallback(
     modelName => genAI.getGenerativeModel({
       model: modelName,
       generationConfig: {
@@ -243,6 +267,9 @@ async function analyzeExercise(description, durationMins, weightKg) {
   }
 }
 
+// NutriAI chat runs directly on the lite model — no fallback chain needed
+// since flash-lite is already the "light" model and chat responses don't
+// need flash-level reasoning. This also halves chat latency/cost vs before.
 async function chatWithNutritionAI(message, context = {}, image = null) {
   assertGeminiKey();
 
@@ -258,19 +285,19 @@ Answer like a practical nutrition coach. Use the user's profile and recent logs 
     : prompt;
 
   try {
-    const result = await runGeminiWithRetry(
-      modelName => genAI.getGenerativeModel({
-      model: modelName,
+    const model = genAI.getGenerativeModel({
+      model: LITE_GEMINI_MODEL,
       systemInstruction: "You are NutriAI, a friendly nutrition and routine assistant for NutriTrack. You help users understand their food logs, calories, protein, exercise, and meal choices. You are not a doctor."
-      }),
-      model => withTimeout(
-        model.generateContent(parts),
-        35000,
-        'NutriAI took too long to respond. Please try again with a shorter question.'
-      )
+    });
+
+    const result = await withTimeout(
+      model.generateContent(parts),
+      35000,
+      'NutriAI took too long to respond. Please try again with a shorter question.'
     );
     return result.response.text();
   } catch (error) {
+    console.error("Gemini API Error (Chat):", error);
     throw normalizeGeminiError(error);
   }
 }
