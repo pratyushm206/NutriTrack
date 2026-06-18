@@ -79,13 +79,6 @@ const faqs = [
   }
 ];
 
-const quotes = [
-  ['Take care of your body. It is the only place you have to live.', 'Jim Rohn'],
-  ['Small meals tracked honestly become big decisions made clearly.', 'NutriTrack'],
-  ['Fitness is not about being perfect. It is about being consistent.', 'Unknown'],
-  ['Good food is not restriction. It is information, energy, and rhythm.', 'NutriTrack']
-];
-
 const footerLinks = {
   Dashboard: '#preview',
   NutriAI: '#how',
@@ -216,15 +209,6 @@ export default function About() {
         <div className="landing-reveal">
           <AppPreview />
         </div>
-      </section>
-
-      <section className="landing-quotes landing-container">
-        {quotes.map(([quote, author]) => (
-          <figure key={quote} className="landing-quote-line landing-reveal">
-            <blockquote>"{quote}"</blockquote>
-            <figcaption>{author}</figcaption>
-          </figure>
-        ))}
       </section>
 
       <section className="landing-about landing-container" id="about">
@@ -360,18 +344,18 @@ function DashboardPreview() {
 function AppPreview() {
   return (
     <div className="landing-preview-gallery">
-      <ScreenshotCard src={dashboardScreenshot} title="Dashboard" alt="NutriTrack dashboard with daily calorie and protein summary" wide />
+      <ScreenshotCard src={dashboardScreenshot} title="Dashboard" alt="NutriTrack dashboard with daily calorie and protein summary" size="dashboard" />
       <ScreenshotCard src={nutriaiScreenshot} title="NutriAI" alt="NutriAI assistant page with nutrition context and chat" />
       <ScreenshotCard src={foodEstimateScreenshot} title="Food estimate" alt="Food nutrition estimate for paneer paratha with butter" />
       <ScreenshotCard src={exerciseEstimateScreenshot} title="Exercise estimate" alt="Exercise estimate with calories and burn breakdown" />
-      <ScreenshotCard src={profileScreenshot} title="Profile targets" alt="Nutrition profile, BMI, and macro split target" wide />
+      <ScreenshotCard src={profileScreenshot} title="Profile targets" alt="Nutrition profile, BMI, and macro split target" size="profile" />
     </div>
   );
 }
 
-function ScreenshotCard({ src, title, alt, wide = false }) {
+function ScreenshotCard({ src, title, alt, size = '' }) {
   return (
-    <figure className={`landing-real-shot ${wide ? 'wide' : ''}`}>
+    <figure className={`landing-real-shot ${size ? `landing-real-shot-${size}` : ''}`}>
       <img src={src} alt={alt} loading="lazy" />
       <figcaption>{title}</figcaption>
     </figure>
