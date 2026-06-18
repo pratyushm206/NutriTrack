@@ -3825,16 +3825,24 @@ body.dark .landing-nav {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1rem;
+  width: min(100%, 980px);
   margin-top: 2rem;
+  margin-inline: auto;
+  align-items: start;
 }
 
 .landing-real-shot {
-  aspect-ratio: 1.12;
+  display: grid;
+  align-self: start;
 }
 
 .landing-real-shot.wide {
   grid-column: span 2;
-  aspect-ratio: 1.9;
+}
+
+.landing-real-shot img {
+  height: auto;
+  object-fit: contain;
 }
 
 .landing-real-shot figcaption {
@@ -4256,7 +4264,6 @@ body.dark .landing-nav {
 
   .landing-real-shot.wide {
     grid-column: span 1;
-    aspect-ratio: 0.82;
   }
 
   .landing-browser-bar {
