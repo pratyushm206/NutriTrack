@@ -11,6 +11,11 @@ import {
   Utensils
 } from 'lucide-react';
 import NutriTrackLogo from '../components/NutriTrackLogo';
+import dashboardScreenshot from '../assets/landing-dashboard-real.png';
+import nutriaiScreenshot from '../assets/landing-nutriai-real.png';
+import foodEstimateScreenshot from '../assets/landing-food-estimate-real.png';
+import exerciseEstimateScreenshot from '../assets/landing-exercise-estimate-real.png';
+import profileScreenshot from '../assets/landing-profile-real.png';
 
 const features = [
   {
@@ -74,12 +79,6 @@ const faqs = [
   }
 ];
 
-const testimonials = [
-  ['RK', 'Rohan K.', 'Fitness enthusiast', 'Finally an app that understands normal Indian meals without making tracking feel like homework.'],
-  ['PS', 'Priya S.', 'Working professional', 'The dashboard is calm and useful. I can see calories, protein, and what to fix in seconds.'],
-  ['AM', 'Arjun M.', 'College student', 'NutriAI suggestions make the app feel practical. It tells me what to eat next, not just numbers.']
-];
-
 const quotes = [
   ['Take care of your body. It is the only place you have to live.', 'Jim Rohn'],
   ['Small meals tracked honestly become big decisions made clearly.', 'NutriTrack'],
@@ -99,7 +98,7 @@ const footerLinks = {
   'About Pratyush': '#about',
   'Privacy first': '#faq',
   Contact: '#cta',
-  'For students': '#testimonials'
+  'For students': '#features'
 };
 
 export default function About() {
@@ -228,30 +227,6 @@ export default function About() {
         ))}
       </section>
 
-      <section className="landing-testimonials" id="testimonials">
-        <div className="landing-container">
-          <div className="landing-section-header landing-reveal">
-            <Pill>Testimonials</Pill>
-            <h2 className="landing-section-title">Real people.<br />Real results.</h2>
-          </div>
-          <div className="landing-test-grid landing-reveal">
-            {testimonials.map(([initials, name, role, text]) => (
-              <article key={name} className="landing-test-card">
-                <div className="landing-stars">*****</div>
-                <p>"{text}"</p>
-                <div className="landing-test-author">
-                  <span>{initials}</span>
-                  <div>
-                    <strong>{name}</strong>
-                    <small>{role}</small>
-                  </div>
-                </div>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
-
       <section className="landing-about landing-container" id="about">
         <div className="landing-builder-card landing-reveal">
           <span>PM</span>
@@ -366,77 +341,40 @@ function FoodRow({ name, meta, calories }) {
 
 function DashboardPreview() {
   return (
-    <>
-      <div className="landing-dash-card">
-        <div className="landing-dash-head">
-          <div>
-            <span>Saturday, May 23</span>
-            <strong>Daily Summary</strong>
-          </div>
-          <NutriTrackLogo className="landing-dash-logo" />
-        </div>
-        <div className="landing-dash-grid">
-          <MiniStat label="Net Calories" value="2,383" active />
-          <MiniStat label="Protein" value="53g" />
-          <MiniStat label="Eaten" value="2,383" />
-          <MiniStat label="Burned" value="0" />
-        </div>
-        <div className="landing-progress-label"><span>Calories</span><strong>100%</strong></div>
-        <div className="landing-progress"><span style={{ width: '100%' }} /></div>
-        <FoodRow name="Dal Chawal + Ghee" meta="Protein 14g - Carbs 58g" calories="420 kcal" />
-        <FoodRow name="Paneer Paratha x2" meta="Protein 22g - Fat 24g" calories="560 kcal" />
-      </div>
+    <div className="landing-screenshot-stack">
+      <figure className="landing-screenshot-card landing-screenshot-main">
+        <img src={dashboardScreenshot} alt="NutriTrack dashboard daily summary screen" />
+      </figure>
       <div className="landing-float-card landing-float-protein">
-        <strong>43%</strong>
-        <span>Protein target</span>
+        <strong>Daily view</strong>
+        <span>Calories, protein, logs, and exercise in one place.</span>
       </div>
       <div className="landing-float-card landing-float-tip">
-        <strong>NutriAI Tip</strong>
-        <span>Add curd or roasted chana to hit your protein goal tonight.</span>
+        <strong>NutriAI</strong>
+        <span>Real in-app guidance from your logged day.</span>
       </div>
-    </>
-  );
-}
-
-function MiniStat({ label, value, active = false }) {
-  return (
-    <div className={`landing-mini-stat ${active ? 'active' : ''}`}>
-      <strong>{value}</strong>
-      <span>{label}</span>
     </div>
   );
 }
 
 function AppPreview() {
   return (
-    <div className="landing-browser-frame">
-      <div className="landing-browser-bar">
-        <span />
-        <span />
-        <span />
-        <p>nutritrack.app - Daily Dashboard</p>
-      </div>
-      <div className="landing-browser-stats">
-        <MiniStat label="Net Calories" value="2,383" active />
-        <MiniStat label="Eaten" value="2,383" />
-        <MiniStat label="Burned" value="0" />
-        <MiniStat label="Protein" value="53g" />
-      </div>
-      <div className="landing-browser-bottom">
-        <ProgressCard title="Calories remaining" left="2383 eaten" right="0 kcal left" percent="100%" tone="green" />
-        <ProgressCard title="Protein target" left="53g eaten" right="64g left" percent="45%" tone="amber" />
-      </div>
+    <div className="landing-preview-gallery">
+      <ScreenshotCard src={dashboardScreenshot} title="Dashboard" alt="NutriTrack dashboard with daily calorie and protein summary" wide />
+      <ScreenshotCard src={nutriaiScreenshot} title="NutriAI" alt="NutriAI assistant page with nutrition context and chat" />
+      <ScreenshotCard src={foodEstimateScreenshot} title="Food estimate" alt="Food nutrition estimate for paneer paratha with butter" />
+      <ScreenshotCard src={exerciseEstimateScreenshot} title="Exercise estimate" alt="Exercise estimate with calories and burn breakdown" />
+      <ScreenshotCard src={profileScreenshot} title="Profile targets" alt="Nutrition profile, BMI, and macro split target" wide />
     </div>
   );
 }
 
-function ProgressCard({ title, left, right, percent, tone }) {
+function ScreenshotCard({ src, title, alt, wide = false }) {
   return (
-    <div className="landing-preview-progress">
-      <strong>{title}</strong>
-      <div className="landing-progress"><span className={tone} style={{ width: percent }} /></div>
-      <p><span>{left}</span><span>{right}</span></p>
-    </div>
+    <figure className={`landing-real-shot ${wide ? 'wide' : ''}`}>
+      <img src={src} alt={alt} loading="lazy" />
+      <figcaption>{title}</figcaption>
+    </figure>
   );
 }
 

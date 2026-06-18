@@ -52,11 +52,16 @@ export default function SettingsPage() {
   };
 
   const savePassword = async () => {
+    if (passwordDraft.newPassword !== passwordDraft.confirmPassword) {
+      setPasswordStatus('New password and confirmation do not match.');
+      return;
+    }
+
     setPasswordStatus('Updating password...');
     try {
       await api.post('/api/auth/change-password', passwordDraft);
       setPasswordDraft({ oldPassword: '', newPassword: '', confirmPassword: '' });
-      setPasswordStatus('Password changed.');
+      setPasswordStatus('Password updated. Use this new password the next time you log in.');
     } catch (error) {
       setPasswordStatus(error.response?.data?.error || 'Could not change password.');
     }
@@ -85,7 +90,7 @@ export default function SettingsPage() {
         <SettingsCard id="account" icon={User} title="Account" sub="Manage your profile and credentials" tone="green">
           <SettingRow label="Name" sub="Your display name across the app"><span>{user?.name}</span><button className="nt-mini-btn" onClick={() => setEditingProfile(prev => !prev)}>Edit Profile</button></SettingRow>
           <SettingRow label="Email" sub="Used for login and notifications"><span>{user?.email}</span></SettingRow>
-          <SettingRow label="Password" sub="Verify your old password before setting a new one"><span className="nt-readonly-value">Protected</span></SettingRow>
+          <SettingRow label="Password" sub="You can change your password anytime by verifying the current one"><span className="nt-readonly-value">Protected</span></SettingRow>
           <PasswordPanel
             draft={passwordDraft}
             status={passwordStatus}
@@ -190,12 +195,13 @@ function PasswordPanel({ draft, status, onChange, onSave }) {
   return (
     <div className="nt-password-panel">
       <div className="nt-edit-profile-grid">
-        <label>Old password<input type="password" value={draft.oldPassword} onChange={event => onChange('oldPassword', event.target.value)} /></label>
-        <label>New password<input type="password" value={draft.newPassword} onChange={event => onChange('newPassword', event.target.value)} /></label>
-        <label>Confirm new password<input type="password" value={draft.confirmPassword} onChange={event => onChange('confirmPassword', event.target.value)} /></label>
+        <label>Current password<input type="password" value={draft.oldPassword} autoComplete="current-password" onChange={event => onChange('oldPassword', event.target.value)} /></label>
+        <label>New password<input type="password" value={draft.newPassword} autoComplete="new-password" onChange={event => onChange('newPassword', event.target.value)} /></label>
+        <label>Confirm new password<input type="password" value={draft.confirmPassword} autoComplete="new-password" onChange={event => onChange('confirmPassword', event.target.value)} /></label>
       </div>
+      <p className="nt-password-note">There is no change limit. After each update, use the newest password as your current password for the next change.</p>
       {status && <p className="nt-edit-profile-status">{status}</p>}
-      <button className="nt-btn primary" onClick={onSave}>Change Password</button>
+      <button className="nt-btn primary" onClick={onSave} disabled={!draft.oldPassword || !draft.newPassword || !draft.confirmPassword}>Update Password</button>
     </div>
   );
 }

@@ -3391,6 +3391,38 @@ body.dark .landing-nav {
   min-height: 36rem;
 }
 
+.landing-screenshot-stack {
+  position: relative;
+  display: grid;
+  min-height: inherit;
+  align-items: center;
+}
+
+.landing-screenshot-card,
+.landing-real-shot {
+  position: relative;
+  overflow: hidden;
+  margin: 0;
+  border: 1px solid var(--lp-border);
+  border-radius: 1.25rem;
+  background: color-mix(in srgb, var(--lp-surface) 90%, transparent);
+  box-shadow: var(--lp-shadow);
+}
+
+.landing-screenshot-card img,
+.landing-real-shot img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+}
+
+.landing-screenshot-main {
+  aspect-ratio: 0.72;
+  max-height: 39rem;
+}
+
 .landing-dash-card,
 .landing-feature-card,
 .landing-how-card,
@@ -3789,6 +3821,36 @@ body.dark .landing-nav {
   padding: 0 1rem 1rem;
 }
 
+.landing-preview-gallery {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+.landing-real-shot {
+  aspect-ratio: 1.12;
+}
+
+.landing-real-shot.wide {
+  grid-column: span 2;
+  aspect-ratio: 1.9;
+}
+
+.landing-real-shot figcaption {
+  position: absolute;
+  left: 0.9rem;
+  bottom: 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--lp-green) 30%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--lp-surface) 80%, transparent);
+  padding: 0.38rem 0.65rem;
+  color: var(--lp-text);
+  font-size: 0.75rem;
+  font-weight: 900;
+  backdrop-filter: blur(14px);
+}
+
 .landing-browser-bar {
   margin: 0 -1rem;
   border-radius: 1.35rem 1.35rem 0 0;
@@ -4159,6 +4221,14 @@ body.dark .landing-nav {
     min-height: auto;
   }
 
+  .landing-screenshot-stack {
+    min-height: auto;
+  }
+
+  .landing-screenshot-main {
+    max-height: 32rem;
+  }
+
   .landing-float-card {
     position: static;
     width: auto;
@@ -4178,6 +4248,15 @@ body.dark .landing-nav {
 
   .landing-browser-frame {
     padding-inline: 0.75rem;
+  }
+
+  .landing-preview-gallery {
+    grid-template-columns: 1fr;
+  }
+
+  .landing-real-shot.wide {
+    grid-column: span 1;
+    aspect-ratio: 0.82;
   }
 
   .landing-browser-bar {
@@ -6534,6 +6613,11 @@ body.dark .dashboard-page #exercise-log .card > :is([class*="rounded-lg"][class*
   z-index: 20;
 }
 
+.dashboard-history-picker {
+  position: relative;
+  justify-self: end;
+}
+
 .dashboard-calendar-popover > div {
   margin-bottom: 0;
 }
@@ -6721,6 +6805,14 @@ body:has(.weekly-summary-page) .btn-secondary {
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.035);
   padding: 1rem;
+}
+
+.nt-password-note {
+  margin: 0.9rem 0 0;
+  color: rgba(238, 247, 239, 0.58);
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1.55;
 }
 
 .nt-settings-status,
@@ -9381,6 +9473,11 @@ body:has(.nutritrack-chat-page) main {
   box-shadow: none !important;
 }
 
+.dashboard-history-picker {
+  position: relative !important;
+  justify-self: end !important;
+}
+
 .dashboard-history-button:hover {
   border-color: rgba(34, 197, 94, 0.32) !important;
   color: rgba(232, 245, 236, 0.86) !important;
@@ -9527,6 +9624,10 @@ body:has(.nutritrack-chat-page) main {
   .dashboard-history-button {
     justify-self: stretch !important;
     justify-content: center !important;
+  }
+
+  .dashboard-history-picker {
+    justify-self: stretch !important;
   }
 
   .dashboard-calendar-popover {

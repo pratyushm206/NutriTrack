@@ -1,5 +1,5 @@
 /* eslint-disable no-unused-vars, react-refresh/only-export-components */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { addMonths, eachDayOfInterval, endOfMonth, endOfWeek, format, isSameDay, startOfMonth, startOfToday, startOfWeek, subDays, subMonths } from 'date-fns';
 import { CalendarDays, ChevronLeft, ChevronRight, Dumbbell, Flame, Sparkles, Target, Trash2, Utensils, X } from 'lucide-react';
 import FoodLogger from '../components/FoodLogger';
@@ -35,6 +35,7 @@ export default function Dashboard() {
   const [visibleMonth, setVisibleMonth] = useState(startOfMonth(startOfToday()));
   const [streak, setStreak] = useState({ current: 0, best: 0, trackedDates: [] });
   const [dailyTip] = useState(() => NUTRITION_TIPS[Math.floor(Math.random() * NUTRITION_TIPS.length)]);
+  const historyCalendarRef = useRef(null);
 
   useEffect(() => {
     const goToday = () => {
@@ -70,6 +71,19 @@ export default function Dashboard() {
     window.addEventListener(BACKEND_WAKE_EVENT, refetchWhenBackendWakes);
     return () => window.removeEventListener(BACKEND_WAKE_EVENT, refetchWhenBackendWakes);
   }, []);
+
+  useEffect(() => {
+    if (!historyCalendarOpen) return undefined;
+
+    const closeCalendarOnOutsideClick = (event) => {
+      if (!historyCalendarRef.current?.contains(event.target)) {
+        setHistoryCalendarOpen(false);
+      }
+    };
+
+    document.addEventListener('pointerdown', closeCalendarOnOutsideClick);
+    return () => document.removeEventListener('pointerdown', closeCalendarOnOutsideClick);
+  }, [historyCalendarOpen]);
 
   useEffect(() => {
     let ignore = false;
@@ -202,25 +216,27 @@ export default function Dashboard() {
                 );
               })}
             </div>
-            <button type="button" onClick={() => setHistoryCalendarOpen(prev => !prev)} className="dashboard-history-button" aria-label="Browse full history">
-              <CalendarDays className="h-4 w-4" />
-              <span>Browse history</span>
-            </button>
-            {historyCalendarOpen && (
-              <div className="dashboard-calendar-popover">
-                <MonthCalendar
-                  month={visibleMonth}
-                  selectedDate={selectedDate}
-                  loggedDates={loggedDates}
-                  onPrevious={() => setVisibleMonth(prev => subMonths(prev, 1))}
-                  onNext={() => setVisibleMonth(prev => addMonths(prev, 1))}
-                  onSelect={(day) => {
-                    setSelectedDate(day);
-                    setHistoryCalendarOpen(false);
-                  }}
-                />
-              </div>
-            )}
+            <div className="dashboard-history-picker" ref={historyCalendarRef}>
+              <button type="button" onClick={() => setHistoryCalendarOpen(prev => !prev)} className="dashboard-history-button" aria-label="Browse full history" aria-expanded={historyCalendarOpen}>
+                <CalendarDays className="h-4 w-4" />
+                <span>Browse history</span>
+              </button>
+              {historyCalendarOpen && (
+                <div className="dashboard-calendar-popover">
+                  <MonthCalendar
+                    month={visibleMonth}
+                    selectedDate={selectedDate}
+                    loggedDates={loggedDates}
+                    onPrevious={() => setVisibleMonth(prev => subMonths(prev, 1))}
+                    onNext={() => setVisibleMonth(prev => addMonths(prev, 1))}
+                    onSelect={(day) => {
+                      setSelectedDate(day);
+                      setHistoryCalendarOpen(false);
+                    }}
+                  />
+                </div>
+              )}
+            </div>
           </div>
         </section>
 
