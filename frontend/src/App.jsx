@@ -106,10 +106,8 @@ const Navbar = () => {
   };
 
   const openRouteInNewTab = (path, tabName = '_blank') => {
-    const targetUrl = new URL(path, window.location.origin).toString();
-    const tab = window.open(targetUrl, tabName);
-    tab?.focus();
-    return tab;
+    navigate(path);
+    return null;
   };
 
   const openNutriAI = () => {
