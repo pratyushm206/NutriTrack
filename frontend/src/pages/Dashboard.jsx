@@ -22,7 +22,7 @@ const NUTRITION_TIPS = [
 export default function Dashboard() {
   const { logout } = useAuth();
   const [selectedDate, setSelectedDate] = useState(startOfToday());
-  const [profile, setProfile] = useState(null);
+  const [profile, setProfile] = useState({ tdee: 0, protein_target: 0 });
   const [foodLogs, setFoodLogs] = useState([]);
   const [exerciseLogs, setExerciseLogs] = useState([]);
   const [selectedFood, setSelectedFood] = useState(null);
@@ -137,38 +137,12 @@ export default function Dashboard() {
     setExerciseLogs(exerciseLogs.filter(log => log.id !== id));
   };
 
-  if (!profile) {
-    return (
-      <>
-        <div className="dashboard-vanta-shell dashboard-loading-backdrop fixed inset-0 top-14" aria-hidden="true">
-          <VantaBirdsBackground />
-        </div>
-        <div className="dashboard-loading-page relative z-10">
-          <div className="dashboard-loader glass-card mx-auto mt-24 max-w-sm p-6 text-center">
-            <div className="dashboard-loader-mark mx-auto mb-5">
-              <span />
-              <span />
-              <span />
-            </div>
-            <p className="dashboard-loader-title">Loading dashboard...</p>
-            <p className="dashboard-loader-copy mt-1">
-              {loadError || 'Preparing your calories, protein, and daily records.'}
-            </p>
-            <div className="dashboard-loader-track mt-5">
-              <div />
-            </div>
-          </div>
-        </div>
-      </>
-    );
-  }
-
   const totalCaloriesIn = foodLogs.reduce((acc, log) => acc + log.calories, 0);
   const totalProtein = foodLogs.reduce((acc, log) => acc + log.protein_g, 0);
   const totalCaloriesBurned = exerciseLogs.reduce((acc, log) => acc + log.calories_burned, 0);
   const netCalories = totalCaloriesIn - totalCaloriesBurned;
-  const caloriePercent = Math.min((netCalories / profile.tdee) * 100, 100);
-  const proteinPercent = Math.min((totalProtein / profile.protein_target) * 100, 100);
+  const caloriePercent = profile.tdee ? Math.min((netCalories / profile.tdee) * 100, 100) : 0;
+  const proteinPercent = profile.protein_target ? Math.min((totalProtein / profile.protein_target) * 100, 100) : 0;
   const macroTotals = getMacroTotals(foodLogs);
   const lastSevenDays = Array.from({ length: 7 }, (_, index) => subDays(startOfToday(), 6 - index));
   const loggedDates = new Set(streak.trackedDates || []);
@@ -179,6 +153,11 @@ export default function Dashboard() {
         <VantaBirdsBackground />
       </div>
       <div className="dashboard-page relative z-10 space-y-4 sm:space-y-6">
+        {loadError && (
+          <div className="glass-card p-4 text-sm" role="status" aria-live="polite">
+            {loadError}
+          </div>
+        )}
         <section className="dashboard-hero-shell">
           <div className="glass-card dashboard-hero-card p-4 sm:p-5">
             <div className="mb-4 flex flex-col gap-3 sm:mb-5 sm:flex-row sm:items-start sm:justify-between">
@@ -243,10 +222,10 @@ export default function Dashboard() {
         <section className="stats-grid relative" aria-label="Nutrition metrics">
           {isFetching && <SummaryLoading />}
           <div className={`contents ${isFetching ? 'opacity-30' : ''}`}>
-            <Metric icon={Target} label="Net Calories" value={netCalories} detail={`Target ${profile.tdee}`} percent={Math.max(caloriePercent, 0)} color="blue" />
+            <Metric icon={Target} label="Net Calories" value={netCalories} detail={profile.tdee ? `Target ${profile.tdee}` : 'Target unavailable'} percent={Math.max(caloriePercent, 0)} color="blue" />
             <Metric icon={Utensils} label="Eaten" value={totalCaloriesIn} detail="kcal logged" percent={profile.tdee ? Math.min((totalCaloriesIn / profile.tdee) * 100, 100) : 0} color="emerald" />
             <Metric icon={Flame} label="Burned" value={totalCaloriesBurned} detail="kcal active" percent={profile.tdee ? Math.min((totalCaloriesBurned / profile.tdee) * 100, 100) : 0} color="orange" />
-            <Metric icon={Dumbbell} label="Protein" value={`${totalProtein}g`} detail={`Target ${profile.protein_target}g`} percent={proteinPercent} color="violet" />
+            <Metric icon={Dumbbell} label="Protein" value={`${totalProtein}g`} detail={profile.protein_target ? `Target ${profile.protein_target}g` : 'Target unavailable'} percent={proteinPercent} color="violet" />
           </div>
         </section>
 
@@ -255,8 +234,8 @@ export default function Dashboard() {
           <div className={`progress-row ${isFetching ? 'opacity-30' : ''}`}>
             <RingProgressCard
               label="Calories remaining"
-              value={`${netCalories} / ${profile.tdee} kcal logged today.`}
-              remaining={`${Math.max(profile.tdee - netCalories, 0)} kcal left`}
+              value={profile.tdee ? `${netCalories} / ${profile.tdee} kcal logged today.` : 'Your calorie target will appear when the backend connects.'}
+              remaining={profile.tdee ? `${Math.max(profile.tdee - netCalories, 0)} kcal left` : 'Target unavailable'}
               percent={Math.max(caloriePercent, 0)}
               accent="#22c55e"
               glow="rgba(34,197,94,0.42)"
@@ -264,8 +243,8 @@ export default function Dashboard() {
             />
             <RingProgressCard
               label="Protein target"
-              value={`${totalProtein} / ${profile.protein_target}g logged today.`}
-              remaining={`${Math.max(profile.protein_target - totalProtein, 0)}g left`}
+              value={profile.protein_target ? `${totalProtein} / ${profile.protein_target}g logged today.` : 'Your protein target will appear when the backend connects.'}
+              remaining={profile.protein_target ? `${Math.max(profile.protein_target - totalProtein, 0)}g left` : 'Target unavailable'}
               percent={proteinPercent}
               accent="#ff8a7a"
               glow="rgba(249,112,96,0.38)"
